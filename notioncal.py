@@ -4,7 +4,7 @@
 * Sync Notion database with Google Calendar
 '''
 
-import requests, json, constants
+import requests, json
 
 #STAGE 1: CHECK IF EDITED SINCE LAST CHECK AND QUERY DB
 
@@ -26,7 +26,7 @@ if response.ok:
     #check if new events since last query
     if 'last_edited' not in props:
         last_checked = resp["created_time"]
-    elif resp["last_edited_time"] > props["kast_edited"]:
+    elif resp["last_edited_time"] > props["last_edited"]:
         last_checked = props["last_edited"]
     else:
         last_checked = None
