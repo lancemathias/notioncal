@@ -1,0 +1,11 @@
+{
+    "name": "notioncal",
+    "type": "module",
+    "version": "1.0.0",
+    "description": "",
+    "main": "app.js",
+    "dependencies": {
+        "@notionhq/client": "^0.1.9",
+        "googleapis": "^92.0.0"
+    }
+}
