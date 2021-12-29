@@ -23,8 +23,8 @@ async function getNotion(client, constants, filter, sorts) {
         constants.last_edited = new Date();
         return response.results;
     }
-    catch (error) {
-        console.log("notion error!");
+    catch (err) {
+        console.log(err);
     }
 }
 
@@ -42,7 +42,6 @@ async function notionToGcal(event) {
         try {
             //get rid of time, all events are all-day
             const date = task['Due Date'].date.start.substring(0, 10);
-            console.log(date);
             const event = {
                 'summary': task.Name.title[0].text.content,
                 'start': {
@@ -50,14 +49,15 @@ async function notionToGcal(event) {
                 },
                 'end': {
                     'date': date
-                },
-                'colorId': '11'
+                }
             }
+            if ('Status' in task) {
+                event['colorId'] =  colors[task.Status.select.color];
+            }
+            return event;
         }
-        catch (error) {
-            //console.log(error);
-            console.log(JSON.stringify(event, null, 2));
-            console.log("conversion error!");
+        catch (err) {
+            console.log(err);
         }
     }
 }
@@ -71,8 +71,8 @@ async function uploadEvent(calendar, _auth, id, event) {
         });
         return response;
     }
-    catch (error) {
-        console.log(error);
+    catch (err) {
+        console.log(err);
     }
 }
 
@@ -80,7 +80,9 @@ async function toCal(auth, id, events) {
     const calendar = google.calendar({ version: 'v3', auth });
     events.forEach(async (element) => {
         const event = await notionToGcal(element);
-        uploadEvent(calendar, auth, id, event);
+        if (event !== undefined) {
+            uploadEvent(calendar, auth, id, event);
+        }
     });
 }
 
@@ -112,15 +114,17 @@ const sorts = [
     }
 ];
 
+//map the Notion event colors to Google Calendar event colors
+const colors = {'red': 4, 'yellow': 5, 'green': 2}
+
 const events = await getNotion(notion, constants, filter, sorts);
 
 //Convert to GC format and push to calendar
 const auth = await makeCal(credentials, token);
+
 toCal(auth, constants.gc_id, events);
 
 //Update our config file to reduce redundancy
-constants.last_edited = new Date();
-//console.log(constants);
-/*fs.writeFile(constantsFile, JSON.stringify(constants, null, 4), (err) => {
+fs.writeFile(constantsFile, JSON.stringify(constants, null, 4), (err) => {
     if (err) console.log(err);
-});*/
+});
