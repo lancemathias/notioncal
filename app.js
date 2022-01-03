@@ -81,7 +81,7 @@ async function toCal(auth, id, events) {
     events.forEach(async (element) => {
         const event = await notionToGcal(element);
         if (event !== undefined) {
-            uploadEvent(calendar, auth, id, event);
+            console.log(uploadEvent(calendar, auth, id, event));
         }
     });
 }
