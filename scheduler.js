@@ -28,23 +28,13 @@ let min_block_size = 1800000;   //half an hour minimum
 let start = 10;
 let end = 20;
 
-function assignBlocks(calendar, events, blocks) {
-    //Only take valid events (both due date and time estimate) and sort by soonest due
-    events = events.filter(task=>'Due Date' in task.properties && 'date' in task.properties['Due Date']
-    && 'start' in task.properties['Due Date'].date &&
-    'Time commitment' in task.properties && 'rich text' in task.properties['Time commitment'] &&
-    task.properties['Time commitment'].length && 
-    'content' in task.properties['Time commitment'].rich_text[0].text)
-    .sort((a,b)=>a['Due Date'].date.start.substring(0, 10)-b['Due Date'].date.start.substring(0, 10));
-    
-    //Start scheduling from the next hour
-    let currTime = new Date();
-    
-    //Get list of potentially conflicting events (between now and last due date, with scheduled times)
-    let conflicts = calendar.events.list({
+//Get list of potentially conflicting calendar events 
+function getConflicts(calendar, events) {
+    const currTime = new Date();
+    return calendar.events.list({
         calendarId: 'primary',  //which calendar should we check???
         timeMin: currTime,
-        timeMax: new Date(events[events.length - 1].properties['Due Date'].date),
+        timeMax: new Date(events[events.length - 1].properties.Due.date),
         singleEvents: true,
         orderBy: 'startTime'
     }, (err, res) => {
@@ -56,24 +46,31 @@ function assignBlocks(calendar, events, blocks) {
         }
         else return [];
     });
+}
+
+function assignBlocks(conflicts, events, blocks) {
+    //Only take valid events (both due date and time estimate) and sort by soonest due
+    events = events.filter(task=>'Due' in task.properties && 'date' in task.properties.Due
+    && 'start' in task.properties.Due.date &&
+    'Time' in task.properties && 'number' in task.properties.Time)
+    .sort((a,b)=>a['Due'].date.start.substring(0, 10)-b['Due'].date.start.substring(0, 10));
     
     //Make a list representing the length of each event
-    //TODO: how do we want to format the time??? - convert to int in notion?
-    times = events.map(event => parseInt(event.properties['Time commitment'].rich_text[0].text.content));
+    times = events.map(event => parseInt(event.properties.Time));
+    
+    //Start scheduling from the next hour; set time to now and perform checks in the loop
+    let currTime = new Date();
 
-    //TODO: move everything to the new simplified Notion DB, also create a new calendar for testing
     //Give blocks of time to each event until all events are scheduled
     while(times.length) {
-        //how to compare time ranges?!?!?!?
         /*
-        //TODO: define working hours range somewhere -- 
         1. See if current time overlaps an event or outside working hours, if so skip to next available time
         2. Schedule block for max block size or until task is done or conflict
         2.5.  If task is is done, remove from times list
         */
         //Make sure we're scheduling for a valid time
         //If we've reached end of day, start scheduling tomorrow
-        if (currtime.getHours() >= end-1) {
+        if (currTime.getHours() >= end-1) {
             currTime.setHours(start);
             currTime.setDate(currTime.getDate() + 1);
         }
@@ -89,19 +86,21 @@ function assignBlocks(calendar, events, blocks) {
                 end: currTime
             }
             //relevant conflicts are after current time and sorted by closest last
-            //TODO: make this more efficient
+            //TODO: make this more efficient by minimizing date casts
             let relevantConflicts = conflicts.filter(conflict => {
-                new Date(conflict.start.dateTime).getTime() >= event.start.getTime();
+                new Date(conflict.start.dateTime).getTime() >= new Date(event.start).getTime();
             }).sort((prev, curr) => {
                 new Date(curr.start.dateTime).getTime() - new Date(prev.start.dateTime).getTime();
             });
             //find non-conflicting time for current block
             while (currBlock.start === currBlock.end) { 
                 let currConflict = relevantConflicts[relevantConflicts.length];
-                //If event doesn't end until after the smallest possible block, don't schedule before event end
-                if(new Date(currConflict.end.dateTime).getTime() < currTime.getTime() + min_block_size) {
+                //If conflict starts before the smallest block would end, schedule after conflict ends
+                if(new Date(currConflict.start.dateTime).getTime() < currTime.getTime() + min_block_size) {
                     currTime = new Date(currConflict.end.dateTime);
-                    relevantConflicts.pop();
+                    while(new Date(relevantConflicts[relevantConflicts.length].start.dateTime).getTime() < currTime.getTime()) {
+                        relevantConflicts.pop();
+                    }
                 }
                 else {
                     //TODO: make this non gross

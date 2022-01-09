@@ -38,10 +38,10 @@ async function makeCal(credentials, token) {
 
 async function notionToGcal(event) {
     const task = event.properties;
-    if ('Due Date' in task && 'date' in task['Due Date'] && 'start' in task['Due Date'].date) {    
+    if ('Due' in task && 'date' in task.Due && 'start' in task.Due.date) {    
         try {
             //get rid of time, all events are all-day
-            const date = task['Due Date'].date.start.substring(0, 10);
+            const date = task.Due.date.start.substring(0, 10);
             const event = {
                 'summary': task.Name.title[0].text.content,
                 'start': {
@@ -109,7 +109,7 @@ const filter = {
 
 const sorts = [
     {
-        property: 'Due Date',
+        property: 'Due',
         direction: 'descending'
     }
 ];
@@ -117,12 +117,17 @@ const sorts = [
 //map the Notion event colors to Google Calendar event colors
 const colors = {'red': 4, 'yellow': 5, 'green': 2}
 
-const events = await getNotion(notion, constants, filter, sorts);
+//For now, read from local file to avoid API calls
+const events = JSON.parse(fs.readFileSync('notion.json'))
+//const events = await getNotion(notion, constants, filter, sorts);
+fs.writeFile("notion.json", JSON.stringify(events, null, 4), (err) => {
+    if (err) console.log(err);
+});
 
 //Convert to GC format and push to calendar
 const auth = await makeCal(credentials, token);
 
-toCal(auth, constants.gc_id, events);
+//toCal(auth, constants.gc_id, events);
 
 //Update our config file to reduce redundancy
 fs.writeFile(constantsFile, JSON.stringify(constants, null, 4), (err) => {
