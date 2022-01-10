@@ -19,7 +19,7 @@
  * Try a dict
  */
 
-import * as Math from 'Math';
+//import * as Math from 'Math';
 
 //set start and end times on the hour
 //TODO: assign these somewhere useful
@@ -39,12 +39,8 @@ function getConflicts(calendar, events) {
         orderBy: 'startTime'
     }, (err, res) => {
         if (err) return console.log('API Error: ' + err);
-        const events = res.data.items;
-        if (events.length) {
-            return events.filter(event => 'dateTime' in event.start)
-            .map(event => ({start: event.start.dateTime, end: event.end.dateTime}));
-        }
-        else return [];
+        return res.data.items.filter(event => 'dateTime' in event.start)
+        .map(event => ({start: event.start.dateTime, end: event.end.dateTime}));
     });
 }
 
@@ -114,3 +110,5 @@ function assignBlocks(conflicts, events, blocks) {
         events = events.filter(event => event.timeCommitment > 0);
     }
 }
+
+export default(getConflicts, assignBlocks);

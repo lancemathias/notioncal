@@ -1,6 +1,5 @@
 import { Client } from '@notionhq/client';
-import * as fs from 'fs';
-import { OAuth2Client } from 'google-auth-library';
+import fs from 'fs';
 import { google } from 'googleapis';
 
 //File paths

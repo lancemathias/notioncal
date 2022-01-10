@@ -6,6 +6,7 @@
     "main": "app.js",
     "dependencies": {
         "@notionhq/client": "^0.1.9",
-        "googleapis": "^92.0.0"
+        "googleapis": "^92.0.0",
+        "Math": "^0.0.1-security"
     }
 }
