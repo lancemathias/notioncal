@@ -27,7 +27,7 @@ async function getNotion(client, constants, filter, sorts) {
     }
 }
 
-async function makeCal(credentials, token) {
+async function getAuth(credentials, token) {
     //TODO: combine all token files at some point LATER??
     const { client_secret, client_id, redirect_uris } = credentials.installed;
     const auth = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
@@ -61,10 +61,10 @@ async function notionToGcal(event) {
     }
 }
 
-async function uploadEvent(calendar, _auth, id, event) {
+async function uploadEvent(calendar, auth, id, event) {
     try {
         const response = await calendar.events.insert({
-            auth: _auth,
+            auth: auth,
             calendarId: id,
             resource: event
         });
@@ -124,7 +124,7 @@ fs.writeFile("notion.json", JSON.stringify(events, null, 4), (err) => {
 });
 
 //Convert to GC format and push to calendar
-const auth = await makeCal(credentials, token);
+const auth = await getAuth(credentials, token);
 
 //toCal(auth, constants.gc_id, events);
 
