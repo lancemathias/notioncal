@@ -114,7 +114,7 @@ const sorts = [
 ];
 
 //map the Notion event colors to Google Calendar event colors
-const colors = {'red': 4, 'yellow': 5, 'green': 2}
+const colors = {'red': 4, 'yellow': 5, 'green': 2, 'overdue': 11}
 
 //For now, read from local file to avoid API calls
 const events = JSON.parse(fs.readFileSync('notion.json'))

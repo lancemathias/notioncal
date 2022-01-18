@@ -17,9 +17,9 @@ const tokenFile = 'token.json'
 
 const events = JSON.parse(fs.readFileSync('notion.json'))
 const conflicts = JSON.parse(fs.readFileSync('conflicts.json'))
-/*
+
 const constants = JSON.parse(fs.readFileSync(constantsFile))
-const credentials = JSON.parse(fs.readFileSync(credentialsFile))
+/*const credentials = JSON.parse(fs.readFileSync(credentialsFile))
 const token = JSON.parse(fs.readFileSync(tokenFile))
 
 const auth = getAuth(credentials, token)
@@ -29,5 +29,5 @@ const conflictsList = scheduler.getConflicts(cal, events)
 console.log(await conflictsList)
 */
 const blocks = []
-scheduler.assignBlocks(conflicts, events, blocks)
+scheduler.assignBlocks(conflicts, events, blocks, constants.block_props)
 console.log(JSON.stringify(blocks, null, 4))
