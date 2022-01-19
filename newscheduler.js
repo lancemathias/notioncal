@@ -8,13 +8,13 @@ class Task {
     constructor(task) {
         this.object = task
         this.id = task.id
-        if ('Name' in task.properties) {
+        if (task.properties && 'Name' in task.properties) {
             this.name = task.properties.Name.title[0].plain_text
         }
-        if ('Due' in task.properties) {
+        if (task.properties && 'Due' in task.properties) {
             this.due = new Date(task.properties.Due.date.start)
         }
-        if ('Time' in task.properties) {
+        if (task.properties && 'Time' in task.properties) {
             this.time = parseFloat(task.properties.Time.number) * 3600000   //idk pick a better time standard
         }
     }
@@ -25,9 +25,9 @@ class Task {
  */
 class Record {
     constructor(record) {
-        this.active = record.active
-        this.blocks = record.blocks
-        this.free = record.free
+        this.active = record && record.active ? record.active : []
+        this.blocks = record && record.blocks ? record.blocks : []
+        this.free = record && record.free ? record.free : []
     }
 }
 
@@ -35,8 +35,8 @@ class Record {
  * Utility class to represent a block of time devoted to a Task 
  */
 class Block {
-    constructor(start, end, object) {
-        this.object = object
+    constructor(start, end, task) {
+        this.task = task
         this.start = new Date(start)
         this.end = new Date(end)
         this.length = this.end.getTime() - this.start.getTime()
@@ -67,6 +67,9 @@ function createValidBlock(start, task, conflicts, short, long, dayStart, dayEnd)
     }
     if (dayEnd === undefined) {
         dayEnd = process.env.dayEnd
+    }
+    if (start.getHours() < dayStart) {
+        start.setHours(dayStart,0,0,0)
     }
 
     let end = start
@@ -134,7 +137,7 @@ function assignBlocks(tasks, conflicts, record, constants) {
     let shortened = changes.filter(task => task.time.getTime() < record.active.find(old => task.id == old.id))
     let shortenBy = shortened.map(task => task.time - record.active.find(old => task.id == old.id).time)
     shortened.forEach((task, index) => {
-        let potentialBlocks = record.blocks.filter(block => block.object.id == task.id).sort((a, b) => a - b)
+        let potentialBlocks = record.blocks.filter(block => block.task.id == task.id).sort((a, b) => a - b)
         //try to free longer blocks first
         let last;
         while (potentialBlocks.length && (last = potentialBlocks[potentialBlocks.length - 1]).length < shortenBy[index]) {
@@ -152,9 +155,9 @@ function assignBlocks(tasks, conflicts, record, constants) {
 
     //modify blocks with changed Tasks
     record.blocks.forEach(block => {
-        let change = changes.find(task => task.id == block.object.id)
+        let change = changes.find(task => task.id == block.task.id)
         if (change) {
-            block.object = change
+            block.task = change
         }
     })
     record.active = record.active.map(task => {
@@ -175,7 +178,7 @@ function assignBlocks(tasks, conflicts, record, constants) {
     let currTime = new Date()
     currTime.setHours(currTime.getHours() + 1, 0, 0, 0)
 
-    let freeBlocks = record.blocks.filter(block => block.object == 'Free')
+    let freeBlocks = record.blocks.filter(block => block.task == 'Free')
     freeBlocks.forEach((free, index) => {
         let safeIndex = index % newTasks.length
         free.object = newTasks[safeIndex]
@@ -184,9 +187,10 @@ function assignBlocks(tasks, conflicts, record, constants) {
             newTasks.splice(safeIndex, 1)
         }
     })
-
+    let {short, long, dayStart, dayEnd} = constants ? constants:
+    {}
     while (times.length) {
-        newTasks.forEach(task, index => {
+        newTasks.forEach((task, index) => {
             let newBlock = createValidBlock(currTime, task, conflicts, short, long, dayStart, dayEnd)
             newBlocks.push(newBlock)
             times[index] -= newBlock.length
@@ -196,27 +200,32 @@ function assignBlocks(tasks, conflicts, record, constants) {
     }
 
     //attempt to reorder events to reach deadlines - assume that there is enough time
-    let overdue = newBlocks.filter(block => block.end.getTime() > block.object.due.getTime())
-    let needSwapping = overdue.map(block => block.object)
+    let overdue = newBlocks.filter(block => block.end.getTime() > block.task.due.getTime())
+    let needSwapping = overdue.map(block => block.task)
     let swappable = newBlocks.filter(block => !needSwapping.includes(block.oject))
 
     //first try to reorder events with same length
     overdue.forEach(block => {
+        let toSwap
         let replacement = newBlocks.find(replacementBlock => swappable.includes(replacementBlock)
-            && swappable.end.getTime() <= block.object.due.getTime()
-            && block.end.getTime() <= swappable.object.due.getTime() && swappable.length == block.length)
-        swap(block, replacement)
+            && replacementBlock.end.getTime() <= block.task.due.getTime()
+            && block.end.getTime() <= replacementblock.task.due.getTime() && swappable.length == block.length)
+        if (replacement) swap(block, replacement)
     })
     //now try to reorder events, allowing for splitting
     overdue.forEach(block => {
         let replacement = newBlocks.find(replacementBlock => swappable.includes(replacementBlock)
-            && swappable.end.getTime() <= block.object.due.getTime()
-            && block.end.getTime() <= swappable.object.due.getTime())
-        partialSwap(block, replacement, newBlocks)
+            && replacementBlock.end.getTime() <= block.task.due.getTime()
+            && block.end.getTime() <= replacementblock.task.due.getTime())
+        if (replacement) partialSwap(block, replacement, newBlocks)
     })
     //if neither of those worked, give up!
 
-    function swap(a, b) { [a.object, b.object] = [b.object, a.object] }
+    function swap(a, b) { 
+        let tmp = a.object
+        a.object = b.object
+        b.object = tmp
+     }
     function partialSwap(a, b, blocks) {
         if (a.length == b.length) { return swap(a, b) }
         let [short, long] = a.length < b.length ? [a, b] : [b, a]
@@ -225,6 +234,8 @@ function assignBlocks(tasks, conflicts, record, constants) {
         long.start.setTime(part)
         short.objet = long.object
     }
+    record.blocks = record.blocks.concat(newBlocks)
+    record.active = record.active.concat(newTasks)
 }
 
 module.exports = { assignBlocks, createValidBlock, Task, Record, Block }

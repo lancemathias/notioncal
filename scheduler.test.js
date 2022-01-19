@@ -112,8 +112,26 @@ test('should create a short block at 1', () => {
         new scheduler.Block(t2.start, t2.end, testTask))
 })
 
+let t3 = {}
+t3.beg = new Date(t1.start)
+t3.beg.setHours(22)
+t3.start = new Date(t1.start)
+t3.start.setDate(t3.start.getDate() + 1)
+t3.start.setHours(1, 0, 0, 0)
+t3.end = new Date(t3.start.getTime()+ (3600000*2))
+t3.block = new scheduler.Block(t3.start, t3.end, testTask)
+test('should create a long block the next day', () => {
+    expect(scheduler.createValidBlock(t3.beg, testTask, [], 3600000, 
+    2*3600000, 1, 10 )).toEqual(t3.block)
+})
 
-
-
-
-
+let t4 = {}
+t4.record = new scheduler.Record()
+t4.expect = [new scheduler.Block(new Date(), new Date(new Date().getTime()
+    + 2*3600000), testTask)]
+test('should create a block immediately', () => {
+    scheduler.assignBlocks([testTask], [], t4.record, {
+        short: 3600000, long: 2*3600000, dayStart: 1, dayEnd: 23
+    })
+    expect(t4.record.blocks).toEqual(t4.expect)
+})
