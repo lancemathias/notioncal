@@ -6,7 +6,18 @@
     "main": "app.js",
     "dependencies": {
         "@notionhq/client": "^0.1.9",
+        "Math": "^0.0.1-security",
         "googleapis": "^92.0.0",
-        "Math": "^0.0.1-security"
+        "jest": "^27.4.7"
+    },
+    "scripts": {
+        "test": "jest ./scheduler.test.js"
+    },
+    "jest": {
+        "verbose": true,
+        "moduleDirectories": [
+            "node_modules",
+            "src"
+        ]
     }
 }
