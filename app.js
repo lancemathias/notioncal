@@ -85,6 +85,28 @@ async function toCal(auth, id, events) {
     });
 }
 
+//Get list of potentially conflicting calendar events 
+async function getConflicts(calendar, events) {
+    //Filter by valid events and sort by due date -- we want the latest one
+    //TODO: this can be more efficient
+    try {     
+        let filtered = events.filter(event => getPropDate(event) !== undefined && getPropTime(event) !== undefined)
+        .sort((a,b)=>getPropDate(a).substring(0, 10)-getPropDate(b).substring(0, 10));
+        const currTime = new Date();
+        const lastDate = new Date(getPropDate(filtered[filtered.length - 1]));
+        const res = await calendar.events.list({
+            calendarId: 'primary',  //which calendar should we check???
+            timeMin: currTime,
+            timeMax: lastDate,
+            singleEvents: true,
+            orderBy: 'startTime'
+        })
+        return res.data.items.filter(event => 'dateTime' in event.start)
+        .map(event => ({start: getEventStart(event), end: getEventEnd(event)}));
+    }
+    catch (err) { return console.log('API Error: ' + err); }
+}
+
 //Get Notion client
 const notion = new Client({ auth: constants.notion_secret });
 

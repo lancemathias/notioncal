@@ -1,229 +1,251 @@
-/**
- * [x] NEW CREATION
- * [x] Sort by due date (nearest first)
- * [x] Go down the list and assign each task one slot, repeat until all tasks will be done
- * [] Find tasks which are overdue
- * [] For each overdue task, iterate over all slots before it and see if there's a *non adjacent* slot \
- * [] that can be swapped 
- * [] If not, see if any slots at all can be swapped
- * [] If not, color item in red and provide message 
- * [] LENGTHEN EXISTING
- * [] Tack extra slots onto the end
- * [] Iterate over times starting from now and ending before due and see if we can swap any without \
- * [] breaking the rules
- * [] If not then swap every other with slots for the assignment that is due the farthest away
- * []SHORTEN EXISTING
- * [] Free the block and we are done
- * [x] BLOCK STRUCTURE
- * [x] Should be done/stored locally to avoid over-querying the Calendar API
- * Try a ~~dict~~ list
- */
+'use strict'
 
-//import * as Math from 'Math';
-
+//Utility classes
 /**
- * Gets the due date from a Notion property
- * @param {*} event a properly formatted Notion event object 
- * @returns the due date in dateTime format
+ * Utility class to simplify Notion tasks because they FUCKING SUCK
  */
-function getPropDate(event) {
-    try {
-        return event.properties.Due.date.start;
-    }
-    catch (err) {
-        console.log(err);
+class Task {
+    constructor(task) {
+        this.object = task
+        this.id = task.id
+        if (task.properties && 'Name' in task.properties) {
+            this.name = task.properties.Name.title[0].plain_text
+        }
+        if (task.properties && 'Due' in task.properties) {
+            this.due = new Date(task.properties.Due.date.start)
+        }
+        if (task.properties && 'Time' in task.properties) {
+            this.time = parseFloat(task.properties.Time.number) * 3600000   //idk pick a better time standard
+        }
     }
 }
 
 /**
- * Returns the time commitment from a Notion property
- * @param {*} event a properly formatted Notion event object
- * @returns expected time commitment as integer(or decimal) hours
+ * Utility class to handle the caching of time blocks; Contains a list of active Tasks as well as the last updated list of time blocks
  */
-function getPropTime(event) {
-    try {
-        return event.properties.Time.number;
-    }
-    catch (err) {
-        console.log(err);
+class Record {
+    constructor(record) {
+        this.active = record && record.active ? record.active : []
+        this.blocks = record && record.blocks ? record.blocks : []
     }
 }
 
-function getEventStart(event) {
-    try {
-        return 'date' in event.start ? event.start.date : event.start.dateTime;
+/**
+ * Utility class to represent a block of time devoted to a Task 
+ */
+class Block {
+    constructor(start, end, task) {
+        this.task = task
+        this.start = new Date(start)
+        this.end = new Date(end)
     }
-    catch (err) {
-        console.log(err);
-    }
+
+    get length() { return this.end.getTime() - this.start.getTime() }
 }
 
-function getEventEnd(event) {
-    try {
-        return 'date' in event.end ? event.end.date : event.end.dateTime;
+/**
+ * Returns a valid Block object which is either short or long time and satisfies given constraints
+ * @param {Date} start the time to start looking from
+ * @param {Task} task the task which will be bound to the Block object
+ * @param {Object[]} conflicts list of conflicts in Google calendar event format
+ * @param {Number} short length of a short block in ms
+ * @param {Number} long length of a long block in ms
+ * @param {Number} dayStart integer representing the earliest hour we can schedule
+ * @param {Number} dayEnd integer representing the latest hour we can schedule
+ * @returns 
+ */
+function createValidBlock(start, task, conflicts, short, long, dayStart, dayEnd) {
+    //Pull default params from dotenv
+    if (short === undefined) {
+        short = process.env.short
     }
-    catch (err) {
-        console.log(err);
+    if (long === undefined) {
+        long = process.env.long
     }
-}
-
-//Get list of potentially conflicting calendar events 
-async function getConflicts(calendar, events, opts) {
-    //Filter by valid events and sort by due date -- we want the latest one
-    //TODO: this can be more efficient
-    try {     
-        let filtered = events.filter(event => getPropDate(event) !== undefined && getPropTime(event) !== undefined)
-        .sort((a,b)=>getPropDate(a).substring(0, 10)-getPropDate(b).substring(0, 10));
-        const currTime = new Date();
-        const lastDate = new Date(getPropDate(filtered[filtered.length - 1]));
-        const res = await calendar.events.list({
-            calendarId: 'primary',  //which calendar should we check???
-            timeMin: currTime,
-            timeMax: lastDate,
-            singleEvents: true,
-            orderBy: 'startTime'
-        })
-        return res.data.items.filter(event => 'dateTime' in event.start)
-        .map(event => ({start: getEventStart(event), end: getEventEnd(event)}));
+    if (dayStart === undefined) {
+        dayStart = process.env.dayStart
     }
-    catch (err) { return console.log('API Error: ' + err); }
-}
+    if (dayEnd === undefined) {
+        dayEnd = process.env.dayEnd
+    }
+    if (start.getHours() < dayStart) {
+        start.setHours(dayStart,0,0,0)
+    }
 
-/** 
- * 1. Start on current time
- * 2. Check for validity
- *  2.1. Is there enough time before conflict?
- *  2.2. Is there enough time before end of day?
- *  2.3. If not, move accordingly (this is DIFFERENT for each above case)
- *  2.4. Back to 2.1, repeat until 2.1 AND 2.2 satisfied
- * 3. Schedule event
- * 4. Move time to after event
- * 5. Repeat at 1.
-*/
+    let end = start
+    while (end.getTime() - start.getTime() < short) {
+        let eod = (new Date(start))
+        eod.setHours(dayEnd, 0, 0, 0)
+        if (conflicts.length) {
+            let nextConflict = conflicts[conflicts.length - 1]
 
-function nextValidtime(currTime, conflicts, opts) {
-    /**
-     * Returns the next time that is during working hours and can be scheduled with a block of at least
-     * min size.
-     * currTime: a Date object to currTime checking from
-     * conflicts: a sorted list of Conflicts objects that's sorted by soonest last
-     */
-    while (currTime.getHours() > (opts.endTime-opts.min_block_size/360000000) && currTime.getHours() < currTimeTime && 
-    currTime.getTime() < conflicts[conflicts.length].start.getTime()-opts.min_block_size) {
-        if (currTime.getHours() <= (opts.endTime-opts.min_block_size/360000000)) {
-            currTime.setHours(currTimeTime)
-            currTime.setDate(currTime.getDate+1)
+            if (nextConflict.start.getTime() - start.getTime() >= long && eod.getTime() - start.getTime() >= long) {
+                end = new Date(start.getTime() + long)
+                break
+            }
+            else if (nextConflict.start.getTime() - start.getTime() >= short && eod.getTime() - start.getTime() >= short) {
+                end = new Date(start.getTime() + short)
+                break
+            }
+            else {
+                if (eod.getTime() < nextConflict.start.getTime()) {
+                    start.setDate(start.getDate() + 1)
+                    start.setHours(dayStart, 0, 0, 0)
+                }
+                else {
+                    start = nextConflict.end
+                }
+                conflicts = conflicts.filter(conflict => conflict.end.getTime() > start.getTime())
+            }
         }
-        if(currTime.getHours() < currTime) {
-            currTime.setHours(currstart)
-        }
-        if(currTime.getTime() < conflicts[conflicts.length-1].start.getTime()-opts.min_block_size) {
-            currTime.setTime(conflicts[conflicts.length-1].end.getTime())
+        else {
+            if (eod.getTime() - start.getTime() >= long) {
+                end = new Date(start.getTime() + long)
+                break
+            }
+            else if (eod.getTime() - start.getTime() >= short) {
+                end = new Date(start.getTime() + short)
+                break
+            }
+            else {
+                start.setDate(start.getDate() + 1)
+                start.setHours(dayStart, 0, 0, 0)
+            }
         }
     }
-    return currTime
+    return new Block(start, end, task)
 }
 
+/**
+ * Assign blocks assuming everything is perfectly formatted
+ * @param {Task[]} tasks An array of Task objects where all have the due and time properties, sorted by due date (soonest first)
+ * @param {Object[]} conflicts An array of Calendar events, where all have a specific time, sorted by soonest last
+ * @param {Record} record A valid Record object
+ * @param {Object} constants Passed in from a validly formed constants.json which defines earliest and latest working times
+ */
+function assignBlocks(tasks, conflicts, record, constants) {
+    //helper variable assignment
+    let {short, long, dayStart, dayEnd} = constants ? constants: {}
+    let existingIds = record.active.map(task => task.object.id)
 
-//restructure blocks to have: active events with event and basic data(due date, time commitment, event ref)
-//also contains blocks array
-//blocks now called record
-//record structure:
-/*
-record = {
-    active: [] list of event references 
-    blocks: [] list of blocks objects
-}
-*/
-function assignBlocks(conflicts, events, record, opts) {
-    //Only take valid events (both due date and time estimate) and sort by soonest due
-    let filteredEvents = events.filter(event => getPropDate(event) !== undefined && getPropTime(event) !== undefined)
-    .sort((a,b)=>getPropDate(a).substring(0, 10)-getPropDate(b).substring(0, 10));
+    let changes = tasks.filter(task => existingIds.includes(task.id))
 
-    //Filter out events that were modified and aren't new and deal with them separately
-    if ('active' in record) {
-        let activeIds = record.active.map(event => event.object.id)
-        let modifiedEvents = filteredEvents.filter(event => activeIds.includes(event.id))  
-    }
-    else {
-        let activeIds = []
-        let modifiedEvents = []
-    }
-    /**
-     * If shortened:
-     *  get list of changed events 
-     *  get list of times that shortened events were shortened by 
-     *  start looking at blocks from last event
-     *  if block is in event that should be shortened, delete event or shorten it until until updated time is reached
-     * If lengthened:
-     *  get list of times that lengthened events were extended by
-     *  make list of new events with same id as existing event, place just like newly created events
-     * If due changed: 
-     *  change due date on event object
-     *  we are done, rebalance like normal 
-     */
+    //process changed events
+    let lengthened = changes.filter(task => task.time > record.active.find(old => task.id == old.id).time)
+    let lengthenedBy = lengthened.map(task => task.time - record.active.find(old => task.id == old.id).time)
 
-    let shortened = modifiedEvents.filter(modded => getPropTime(modded) < getPropTime(filteredEvents.find(event => event.id == modded.id)))
-    let shortenedBy = shortened.map(modded => getPropTime(filteredEvents.find(event => event.id == modded.id)) - getPropTime(modded))
-    while(shortenedBy.length) {
-
-    }
-    let lengthened = modifiedEvents.filter(modded => getPropTime(modded) > getPropTime(filteredEvents.find(event => event.id == modded.id)))
-    let lengthened = lengthened.filter(modded => getPropTime(modded) - getPropTime(filteredEvents.find(event => event.id == modded.id)))
-    //find events with changed due date and change the due date
-    modifiedEvents.forEach(modded => {
-        let original = filteredEvents.find(event => event.id == modded.id)
-        if(getPropDate(modded) !== getPropDate(changed)) {
-            original.object.properties.Due.date.start = getPropDate(modded)
+    //set unused blocks of shortened events to Free so we can use them again
+    let shortened = changes.filter(task => task.time < record.active.find(old => task.id == old.id).time)
+    let shortenBy = shortened.map(task => record.active.find(old => task.id == old.id).time - task.time)
+    shortened.forEach((task, index) => {
+        let potentialBlocks = record.blocks.filter(block => block.task.id == task.id).sort((a, b) => a - b)
+        //try to free longer blocks first
+        let last;
+        while (potentialBlocks.length && (last = potentialBlocks[potentialBlocks.length - 1]).length <= shortenBy[index]) {
+            last.task = 'Free'
+            potentialBlocks.pop()
+            shortenBy[index] -= last.time
+        }
+        //afterwards free shorter blocks until can't remove any more
+        while (potentialBlocks.length && (last = potentialBlocks[0]).length <= shortenBy[index]) {
+            last.task = 'Free'
+            potentialBlocks.shift()
+            shortenBy[index] -= last.time
+        }
+        //shortenBy is now less than 1 block size, split the block if both blocks are still usable time
+        if(shortenBy >= short && (last = potentialBlocks[0]).length-shortenBy >= short) {
+            let part = new Date(last.end.getTime() - shortenBy)
+            record.blocks.push(new Block(part, last.end, 'Free'))
+            last.end = part
         }
     })
 
-    //Make a list representing the length of each event
-    let times = filteredEvents.map(event => parseFloat(getPropTime(event)));
-    
-    //Start scheduling from the next hour; set time to now and perform checks in the loop
-    let currTime = new Date();
-    currTime.setHours(currTime.getHours()+1);
-    currTime.setMinutes(0,0,0);
+    //modify blocks with changed Tasks
+    record.blocks.forEach(block => {
+        let change = changes.find(task => task.id == block.task.id)
+        if (change) {
+            block.task = change
+        }
+    })
+    record.active = record.active.map(task => {
+        let change = changes.find(old => old.id == task.id)
+        if (change) {
+            return change
+        }
+        else {
+            return task
+        }
+    })
 
-    let sortedConflicts = conflicts.sort((prev, curr) => {
-        new Date(getEventStart(curr)).getTime() - new Date(getEventStart(prev)).getTime();
-    });
+    //populate record with time blocks for new tasks plus lengthened tasks
+    let newTasks = tasks.filter(task => !(existingIds.includes(task.id)))
+    let totalTasks = newTasks.concat(lengthened)
+    let times = newTasks.map(element => element.time).concat(lengthenedBy)
+    let newBlocks = []
 
-    //Give blocks of time to each event until all events are scheduled
-    while(times.length) {
-        /*
-        1. See if current time overlaps an event or outside working hours, if so skip to next available time
-        2. Schedule block for max block size or until task is done or conflict
-        2.5.  If task is is done, remove from times list
-        */
-       
-       filteredEvents.forEach((element, index) => {
-            sortedConflicts = sortedConflicts.filter(conflict => currTime < new Date(conflict.end.dateTime))
-            currTime = nextValidtime(currTime, conflicts, opts);
-            let endOfDay = new Date()
-            if(endOfDay.getHours() >= opts.endTime) {
-                endOfDay.setDate(endOfDay.getDate() + 1)
-            }
-                endOfDay.setHours(opts.endTime, 0, 0)
-            let blockEnd = new Date(currTime.getTime() + Math.min(opts.max_block_size, times[index]*3600000, 
-            (new Date(conflicts[conflicts.length-1].start.dateTime)).getTime()-currTime.getTime(),
-            endOfDay.getTime()-currTime.getTime()))
-            let currBlock = {
-                object: element, 
-                start: currTime, 
-                end: blockEnd, 
-            }
-            //TODO: make this more efficient by minimizing date casts
+    let currTime = new Date()
+    currTime.setHours(currTime.getHours() + 1, 0, 0, 0)
 
-            //find non-conflicting time for current block
-            
-            record.push(currBlock);
-            times[index] -= (currBlock.end.getTime() - currBlock.start.getTime())/3600000
-        });
-        filteredEvents = filteredEvents.filter((_, index) => times[index] > 0)
+    //schedule free blocks before scheduling filled blocks
+    let freeBlocks = record.blocks.filter(block => block.task == 'Free')
+    freeBlocks.forEach((free, index) => {
+        let safeIndex = index % totalTasks.length
+        free.object = totalTasks[safeIndex]
+        if ((times[safeIndex] -= free.length) <= 0) {
+            times.splice(safeIndex, 1)
+            totalTasks.splice(safeIndex, 1)
+        }
+    })
+
+    let conflictsPlusBlocks = conflicts.concat(record.blocks)
+    while (times.length) {
+        totalTasks.forEach((task, index) => {
+            let newBlock = createValidBlock(currTime, task, conflictsPlusBlocks, short, long, dayStart, dayEnd)
+            newBlocks.push(newBlock)
+            times[index] -= newBlock.length
+            currTime = newBlock.end
+        })
+        totalTasks = totalTasks.filter((_, index) => times[index] > 0)
         times = times.filter(time => time > 0)
     }
+
+    //attempt to reorder events to reach deadlines - assume that there is enough time
+    let overdue = newBlocks.filter(block => block.end.getTime() > block.task.due.getTime())
+    let needSwapping = overdue.map(block => block.task)
+    let swappable = newBlocks.filter(block => !needSwapping.includes(block.oject))
+
+    //first try to reorder events with same length
+    overdue.forEach(block => {
+        let toSwap
+        let replacement = newBlocks.find(replacementBlock => swappable.includes(replacementBlock)
+            && replacementBlock.end.getTime() <= block.task.due.getTime()
+            && block.end.getTime() <= replacementblock.task.due.getTime() && swappable.length == block.length)
+        if (replacement) swap(block, replacement)
+    })
+    //now try to reorder events, allowing for splitting
+    overdue.forEach(block => {
+        let replacement = newBlocks.find(replacementBlock => swappable.includes(replacementBlock)
+            && replacementBlock.end.getTime() <= block.task.due.getTime()
+            && block.end.getTime() <= replacementblock.task.due.getTime())
+        if (replacement) partialSwap(block, replacement, newBlocks)
+    })
+    //if neither of those worked, give up!
+
+    function swap(a, b) { 
+        let tmp = a.object
+        a.object = b.object
+        b.object = tmp
+     }
+    function partialSwap(a, b, blocks) {
+        if (a.length == b.length) { return swap(a, b) }
+        let [short, long] = a.length < b.length ? [a, b] : [b, a]
+        let part = long.start.getTime() + short.length
+        blocks.push(new Block(long.start, part, short.object))
+        long.start.setTime(part)
+        short.objet = long.object
+    }
+    record.blocks = record.blocks.concat(newBlocks)
+    record.active = [...new Set(record.blocks.filter(block => block.task !== 'Free').map(block => block.task))]
 }
 
-export default { getConflicts, assignBlocks };
+module.exports = { assignBlocks, createValidBlock, Task, Record, Block }

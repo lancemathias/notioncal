@@ -1,3 +1,5 @@
+'use strict'
+
 import fs from 'fs'
 import scheduler from './scheduler.js'
 import {google} from 'googleapis'
