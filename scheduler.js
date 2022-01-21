@@ -246,6 +246,8 @@ function assignBlocks(tasks, conflicts, record, constants) {
     }
     record.blocks = record.blocks.concat(newBlocks)
     record.active = [...new Set(record.blocks.filter(block => block.task !== 'Free').map(block => block.task))]
+    return changes
 }
 
-module.exports = { assignBlocks, createValidBlock, Task, Record, Block }
+//module.exports = { assignBlocks, createValidBlock, Task, Record, Block }
+export { assignBlocks, createValidBlock, Task, Record, Block }
