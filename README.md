@@ -1,8 +1,8 @@
 # notioncal
 
 A planning app which automatically schedules your tasks in [Google Calendar](https://calendar.google.com) using [time blocking](https://todoist.com/productivity-methods/time-blocking). 
-Studies [suggest](https://scholar.harvard.edu/files/todd_rogers/files/beyond_good_intentions_-_prompting_people.pdf) that planning specific blocks of time to finish tasks improves productivit. 
-Notioncal does this automatically by taking events from your Notion board and scheduling blocks during your work hours to finish them, scheduling around your existing Google calendar events. The app will automatically optimize the order of your tasks, avoiding long blocks of the same task and alerting you when you won't be able to finish a task before the due date.
+Studies [suggest](https://scholar.harvard.edu/files/todd_rogers/files/beyond_good_intentions_-_prompting_people.pdf) that planning specific blocks of time to finish tasks improves productivity. 
+Notioncal does this automatically by taking events from your Notion board and scheduling blocks during your work hours to finish them, working around your existing Google calendar events. The script will automatically optimize the order of your tasks, avoiding long blocks of the same task and alerting you when you won't be able to finish a task before the due date.
 
 ## Getting started
 
@@ -11,7 +11,9 @@ Notion board must have the following format:
 - A number property named "Time" which corresponds to the estimated time commitment of the task, in hours
 - A date property named "Due" which is the due date of the task
 - The "Last edited time" property renamed to "Last Edited" (case-sensitive)
+
 Notion board should have allt he properties shown in the example here - extra properties are OK too:
+
 ![notion_example](https://i.imgur.com/2WJCUPW.png)
 
 
