@@ -1,3 +1,10 @@
+/**
+ * index.js 
+ * By Lance Mathias <l.a.mathia1@gmail.com>
+ * Creates Google calendar time blocks from Notion. For more info, read README
+ */
+'use strict'
+
 import {} from 'dotenv/config'
 import { Client } from '@notionhq/client';
 import fs from 'fs';
@@ -9,6 +16,8 @@ import { getNotion, getAuth, uploadEvent, getConflicts} from './interfaces.js'
 const stupid_shit = JSON.parse(fs.readFileSync('./.env.json'))
 const credentials = stupid_shit.GCAL_CREDENTIALS
 const token = stupid_shit.GCAL_TOKEN
+process.env.GCAL_CREDENTIALS = credentials
+process.env.GCAL_TOKEN = token
 
 //Pull locally cached blocks record
 let record
@@ -50,7 +59,7 @@ const notion = await getNotion(new Client({ auth: process.env.NOTION_KEY }), fil
 const tasks = notion.map(task => new Task(task))
 
 //Initialize GCal client
-const auth = await getAuth(credentials, token);
+const auth = await getAuth(GCAL_CREDENTIALS, GCAL_TOKEN);
 const calendar = google.calendar({ version: 'v3', auth });
 
 const conflicts = await getConflicts(calendar, tasks) 

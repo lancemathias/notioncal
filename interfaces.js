@@ -1,3 +1,10 @@
+/**
+ * interfaces.js 
+ * By Lance Mathias <l.a.mathia1@gmail.com>
+ * Methods for interfacing with Notion and Google Calendar apis
+ */
+'use strict'
+
 import { google } from 'googleapis';
 
 async function getNotion(client, filter, sorts) {
@@ -74,7 +81,7 @@ function blockToGcal(block) {
 async function uploadEvent(calendar, auth, block) {
     //Colors for GCal events
     const colors = { 'red': 4, 'yellow': 5, 'green': 2, 'overdue': 11 }
-    
+
     try {
         const event = {
             'summary': block.task.name,
