@@ -1,8 +1,12 @@
+/**
+ * scheduler.js 
+ * By Lance Mathias <l.a.mathia1@gmail.com>
+ * Scheduling and block generation logic
+ */
 'use strict'
 
-//Utility classes
 /**
- * Utility class to simplify Notion tasks because they FUCKING SUCK
+ * Utility class to wrap Notion tasks with useful data
  */
 class Task {
     constructor(task) {
@@ -108,7 +112,7 @@ function createValidBlock(start, task, conflicts, short, long, dayStart, dayEnd)
  * @param {Task[]} tasks An array of Task objects where all have the due and time properties, sorted by due date (soonest first)
  * @param {Object[]} conflicts An array of Calendar events, where all have a specific time, sorted by soonest last
  * @param {Record} record A valid Record object
- * @param {Object} constants Passed in from a validly formed constants.json which defines earliest and latest working times
+ * @param {Object=} override A list of 4 items to override environment variables: length of a short block in ms, length of a long block in ms, the earliest hour to schedule, and the latest hour to schedule.
  */
 function assignBlocks(tasks, conflicts, record, override) {
     //helper variable assignment
