@@ -1,11 +1,13 @@
-async function getNotion(client, constants, filter, sorts) {
+import { google } from 'googleapis';
+
+async function getNotion(client, filter, sorts) {
     try {
         const response = await client.databases.query({
-            database_id: constants.database_id,
+            database_id: process.env.NOTION_ID,
             filter: filter,
             sorts: sorts
         });
-        constants.last_edited = new Date();
+        process.env.LAST_CHECKED = new Date();
         return response.results;
     }
     catch (err) {
@@ -21,7 +23,7 @@ async function getAuth(credentials, token) {
     return auth
 }
 
-async function notionToGcal(event) {
+function notionToGcal(event) {
     const task = event.properties;
     if ('Due' in task && 'date' in task.Due && 'start' in task.Due.date) {
         try {
@@ -48,6 +50,8 @@ async function notionToGcal(event) {
 }
 
 function blockToGcal(block) {
+   //Colors for GCal events
+    const colors = { 'red': 4, 'yellow': 5, 'green': 2, 'overdue': 11 }
     try {
         const event = {
             'summary': block.task.name,
@@ -67,54 +71,61 @@ function blockToGcal(block) {
     catch (err) { console.log(err) }
 }
 
-async function uploadEvent(calendar, auth, id, event, dupes) {
+async function uploadEvent(calendar, auth, block) {
+    //Colors for GCal events
+    const colors = { 'red': 4, 'yellow': 5, 'green': 2, 'overdue': 11 }
+    
     try {
-        if (dupes.includes(event.description)) {
-            const response = await calendar.events.insert({
-                auth: auth,
-                calendarId: id,
-                resource: event
+        const event = {
+            'summary': block.task.name,
+            'description': block.task.id,
+            'start': {
+                'dateTime': block.start
+            },
+            'end': {
+                'dateTime': block.end
+
+            },
+            eventType: 'focusTime',
+        }
+        if (block.end > block.task.due) { event.colorId = colors.overdue }
+
+        if(block.task == 'Free' && block.gc_id) {
+            const response = await calendar.events.delete({
+                auth: auth, eventId: block.gc_id,
+                calendarId: process.env.TASK_CALENDAR_ID
             })
         }
-        else {
+        else if (block.gc_id) {
             const response = await calendar.events.update({
                 auth: auth,
-                calendarId: id,
+                eventId: block.gc_id,
+                calendarId: process.env.TASK_CALENDAR_ID,
                 resource: event
             })
+            return response
         }
-        return response
+        else {
+            const response = await calendar.events.insert({
+                auth: auth,
+                calendarId: process.env.TASK_CALENDAR_ID,
+                resource: event
+            })
+            block.gc_id = response.eventId
+            return response
+        }
     }
     catch (err) {
         console.log(err);
     }
 }
 
-//Get list of potentially duplicated calendar events 
-async function getDupes(calendar, tasks, calId, changed) {
-    try {
-        let filtered = tasks.sort((a, b) => a.due.geTime() - b.due.getTime());
-        const start = new Date();
-        const end = new Date(getPropDate(filtered[filtered.length - 1]));
-        const res = await calendar.events.list({
-            calendarId: calId, 
-            timeMin: start,
-            timeMax: end,
-            singleEvents: true,
-            orderBy: 'startTime'
-        })
-        return res.data.items.filter(event => changed.includes(event.description))
-            .map(event => event.description);
-    }
-    catch (err) { return console.log(err); }
-}
-
 //Get list of potentially conflicting calendar events 
 async function getConflicts(calendar, tasks) {
     try {
-        let filtered = tasks.sort((a, b) => a.due.geTime() - b.due.getTime());
+        let filtered = tasks.sort((a, b) => a.due - b.due);
         const start = new Date();
-        const end = new Date(getPropDate(filtered[filtered.length - 1]));
+        const end = filtered[filtered.length - 1].due;
         const res = await calendar.events.list({
             calendarId: 'primary',  //which calendar should we check???
             timeMin: start,
@@ -128,4 +139,4 @@ async function getConflicts(calendar, tasks) {
     catch (err) { return console.log(err); }
 }
 
-export { getNotion, getAuth, notionToGcal, blockToGcal, uploadEvent, getDupes, getConflicts}
+export { getNotion, getAuth, notionToGcal, blockToGcal, uploadEvent, getConflicts}

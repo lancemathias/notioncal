@@ -1,21 +1,24 @@
+import {} from 'dotenv/config'
 import { Client } from '@notionhq/client';
 import fs from 'fs';
 import { google } from 'googleapis';
 import { Task, Record, Block, assignBlocks } from './scheduler.js';
-import { getNotion, getAuth, notionToGcal, blockToGcal, uploadEvent, getDupes, getConflicts} from './interfaces.js'
-
-//File paths
-const constantsFile = 'constants.json';
-const credentialsFile = 'credentials.json';
-const tokenFile = 'token.json';
+import { getNotion, getAuth, uploadEvent, getConflicts} from './interfaces.js'
 
 //Globally used constants
-const constants = JSON.parse(fs.readFileSync(constantsFile));
-const credentials = JSON.parse(fs.readFileSync(credentialsFile));
-const token = JSON.parse(fs.readFileSync(tokenFile));
+const stupid_shit = JSON.parse(fs.readFileSync('./.env.json'))
+const credentials = stupid_shit.GCAL_CREDENTIALS
+const token = stupid_shit.GCAL_TOKEN
 
-//Colors for GCal events
-const colors = { 'red': 4, 'yellow': 5, 'green': 2, 'overdue': 11 }
+//Pull locally cached blocks record
+let record
+try {
+    record = new Record(JSON.parse(fs.readFileSync('./record.json')))
+}
+catch (err) {
+    console.log(err)
+    record = new Record()
+}
 
 //Sorts and filters for relevant Notion tasks
 const filters = {
@@ -23,7 +26,7 @@ const filters = {
         {
             property: 'Last Edited',
             date: {
-                after: constants.last_edited
+                after: process.env.LAST_CHECKED
             }
         },
         {
@@ -42,36 +45,28 @@ const sorts = [
     }
 ];
 
-//For now, read from local file to avoid API calls
-const events = JSON.parse(fs.readFileSync('notion.json'))
-fs.writeFile("notion.json", JSON.stringify(events, null, 4), (err) => {
-    if (err) console.log(err);
-});
-//AWFUL GARBAGE SHIT CODE DELETE SOON PLS
 
-//Initialize Notion client
-const notion = await getNotion(new Client({ auth: constants.notion_secret }), constants, filters, sorts)
+const notion = await getNotion(new Client({ auth: process.env.NOTION_KEY }), filters, sorts)
 const tasks = notion.map(task => new Task(task))
 
 //Initialize GCal client
 const auth = await getAuth(credentials, token);
 const calendar = google.calendar({ version: 'v3', auth });
 
+const conflicts = await getConflicts(calendar, tasks) 
 
-const conflicts = await getConflicts(calendar, tasks)
-const record = new Record()
-const c = { short: 3600000, long: 2 * 3600000, dayStart: 9, dayEnd: 9 }
+const changedBlocks = assignBlocks(tasks, conflicts, record)
 
-const changes = assignBlocks(tasks, conflicts, record, c)
-const dupes = await getDupes(calendar, tasks, changes)
-const blocks = record.blocks.map(block => blockToGcal(calendar, auth, id, block))
-blocks.forEach(async (element) => {
-    const event = await notionToGcal(element);
-    if (event) {
-        console.log(uploadEvent(calendar, auth, id, event, dupes));
-    }
+record.blocks.forEach(block => {
+    uploadEvent(calendar, auth, block)
 })
-//Update our config file to reduce redundancy
-fs.writeFileSync(constantsFile, JSON.stringify(constants, null, 4), (err) => {
-    if (err) console.log(err);
-});
+
+//Cache updated record
+try {
+    if(record) {
+        fs.writeFileSync('./record.json', JSON.stringify(record, null, 4))
+    }
+}
+catch (err) {
+    console.log(err)
+}

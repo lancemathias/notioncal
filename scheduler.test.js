@@ -1,6 +1,8 @@
 'use strict'
 //import scheduler from './scheduler.js'
 const scheduler = require('./scheduler.js')
+require('dotenv').config()
+
 
 let notion = {
     "object": "page",
@@ -126,15 +128,13 @@ test('should create a long block the next day', () => {
 
 
 let t4 = {}
-test('should create a block immediately', () => {
+test('should schedule a block immediately', () => {
     t4.record = new scheduler.Record()
     let nextHour = new Date()
     nextHour.setHours(nextHour.getHours() + 1, 0, 0 , 0)
     t4.expect = [new scheduler.Block(nextHour, new Date(nextHour.getTime()
     + 2*3600000), testTask)]
-    scheduler.assignBlocks([testTask], [], t4.record, {
-        short: 3600000, long: 2*3600000, dayStart: 1, dayEnd: 23
-    })
+    scheduler.assignBlocks([testTask], [], t4.record, [3600000, 2*3600000, 1, 100])
     let out = t4.record.blocks
     let sortFun = (a,b) => a.start - b.start
     expect(t4.record.blocks.length).toBe(t4.expect.length)
@@ -153,9 +153,7 @@ test('should leave current block and add a new block after', () => {
         new scheduler.Block(new Date(nextHour.getTime()
         + 2*3600000), new Date(nextHour.getTime()
         + 4*3600000), changed)]
-    scheduler.assignBlocks([changed], [], t4.record, {
-        short: 3600000, long: 2*3600000, dayStart: 1, dayEnd: 23
-    })
+    scheduler.assignBlocks([changed], [], t4.record, [3600000, 2*3600000, 1, 100])
     let out = t4.record.blocks
     let sortFun = (a,b) => a.start - b.start
     out.sort(sortFun)
@@ -176,9 +174,7 @@ test('should delete last block', () => {
         new scheduler.Block(new Date(nextHour.getTime()
         + 2*3600000), new Date(nextHour.getTime()
         + 4*3600000), 'Free')]
-    scheduler.assignBlocks([changed], [], t4.record, {
-        short: 3600000, long: 2*3600000, dayStart: 1, dayEnd: 23
-    })
+    scheduler.assignBlocks([changed], [], t4.record, [3600000, 2*3600000, 1, 100])
     let out = t4.record.blocks
     let sortFun = (a,b) => a.start - b.start
     out.sort(sortFun)
@@ -202,9 +198,7 @@ test('should split block in half and delete second half', () => {
         new scheduler.Block(new Date(nextHour.getTime()
         + 2*3600000), new Date(nextHour.getTime()
         + 4*3600000), 'Free')]
-    scheduler.assignBlocks([changed], [], t4.record, {
-        short: 3600000, long: 2*3600000, dayStart: 1, dayEnd: 23
-    })
+    scheduler.assignBlocks([changed], [], t4.record, [3600000, 2*3600000, 1, 100])
     let out = t4.record.blocks
     let sortFun = (a,b) => a.start - b.start
     out.sort(sortFun)

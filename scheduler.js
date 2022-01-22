@@ -55,21 +55,8 @@ class Block {
  * @returns 
  */
 function createValidBlock(start, task, conflicts, short, long, dayStart, dayEnd) {
-    //Pull default params from dotenv
-    if (short === undefined) {
-        short = process.env.short
-    }
-    if (long === undefined) {
-        long = process.env.long
-    }
-    if (dayStart === undefined) {
-        dayStart = process.env.dayStart
-    }
-    if (dayEnd === undefined) {
-        dayEnd = process.env.dayEnd
-    }
     if (start.getHours() < dayStart) {
-        start.setHours(dayStart,0,0,0)
+        start.setHours(dayStart, 0, 0, 0)
     }
 
     let end = start
@@ -123,9 +110,19 @@ function createValidBlock(start, task, conflicts, short, long, dayStart, dayEnd)
  * @param {Record} record A valid Record object
  * @param {Object} constants Passed in from a validly formed constants.json which defines earliest and latest working times
  */
-function assignBlocks(tasks, conflicts, record, constants) {
+function assignBlocks(tasks, conflicts, record, override) {
     //helper variable assignment
-    let {short, long, dayStart, dayEnd} = constants ? constants: {}
+    //Pull default params from dotenv
+    let short, long, dayStart, dayEnd
+    if (override && override.length == 4) {
+        [short, long, dayStart, dayEnd] = override
+    }
+    else {
+        short = parseInt(process.env.SHORT)
+        long = parseInt(process.env.LONG)
+        dayStart = parseInt(process.env.DAYSTART)
+        dayEnd = parseInt(process.env.DAYEND)
+    }
     let existingIds = record.active.map(task => task.object.id)
 
     let changes = tasks.filter(task => existingIds.includes(task.id))
@@ -153,7 +150,7 @@ function assignBlocks(tasks, conflicts, record, constants) {
             shortenBy[index] -= last.time
         }
         //shortenBy is now less than 1 block size, split the block if both blocks are still usable time
-        if(shortenBy >= short && (last = potentialBlocks[0]).length-shortenBy >= short) {
+        if (shortenBy >= short && (last = potentialBlocks[0]).length - shortenBy >= short) {
             let part = new Date(last.end.getTime() - shortenBy)
             record.blocks.push(new Block(part, last.end, 'Free'))
             last.end = part
@@ -190,7 +187,7 @@ function assignBlocks(tasks, conflicts, record, constants) {
     let freeBlocks = record.blocks.filter(block => block.task == 'Free')
     freeBlocks.forEach((free, index) => {
         let safeIndex = index % totalTasks.length
-        free.object = totalTasks[safeIndex]
+        free.task = totalTasks[safeIndex]
         if ((times[safeIndex] -= free.length) <= 0) {
             times.splice(safeIndex, 1)
             totalTasks.splice(safeIndex, 1)
@@ -231,18 +228,18 @@ function assignBlocks(tasks, conflicts, record, constants) {
     })
     //if neither of those worked, give up!
 
-    function swap(a, b) { 
-        let tmp = a.object
-        a.object = b.object
-        b.object = tmp
-     }
+    function swap(a, b) {
+        let tmp = a.task
+        a.task = b.task
+        b.task = tmp
+    }
     function partialSwap(a, b, blocks) {
         if (a.length == b.length) { return swap(a, b) }
         let [short, long] = a.length < b.length ? [a, b] : [b, a]
         let part = long.start.getTime() + short.length
-        blocks.push(new Block(long.start, part, short.object))
+        blocks.push(new Block(long.start, part, short.task))
         long.start.setTime(part)
-        short.objet = long.object
+        short.task = long.task
     }
     record.blocks = record.blocks.concat(newBlocks)
     record.active = [...new Set(record.blocks.filter(block => block.task !== 'Free').map(block => block.task))]

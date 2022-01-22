@@ -9,9 +9,11 @@
     },
     "dependencies": {
         "@notionhq/client": "^0.1.9",
-        "Math": "^0.0.1-security",
-        "googleapis": "^92.0.0",
-        "jest": "^27.4.7"
+        "dotenv": "^14.2.0",
+        "dotenv-json": "^1.0.0",
+        "googleapis": "^39.2.0",
+        "jest": "^27.4.7",
+        "Math": "^0.0.1-security"
     },
     "scripts": {
         "test": "jest ./scheduler.test.js"
