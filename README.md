@@ -12,7 +12,7 @@ Notion board must have the following format:
 - A date property named "Due" which is the due date of the task
 - The "Last edited time" property renamed to "Last Edited" (case-sensitive)
 Notion board should have allt he properties shown in the example here - extra properties are OK too:
-![notion_example](https://imgur.com/YKtlgzB)
+![notion_example](https://i.imgur.com/2WJCUPW.png)
 
 
 1. Clone this repo. In the project directory, install dependencies with `npm install`
