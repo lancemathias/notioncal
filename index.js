@@ -12,13 +12,6 @@ import { google } from 'googleapis';
 import { Task, Record, Block, assignBlocks } from './scheduler.js';
 import { getNotion, getAuth, uploadEvent, getConflicts} from './interfaces.js'
 
-//Globally used constants
-const stupid_shit = JSON.parse(fs.readFileSync('./.env.json'))
-const credentials = stupid_shit.GCAL_CREDENTIALS
-const token = stupid_shit.GCAL_TOKEN
-process.env.GCAL_CREDENTIALS = credentials
-process.env.GCAL_TOKEN = token
-
 //Pull locally cached blocks record
 let record
 try {
@@ -54,28 +47,31 @@ const sorts = [
     }
 ];
 
+async function main() {
+    const notion = await getNotion(new Client({ auth: process.env.NOTION_KEY }), filters, sorts)
+    const tasks = notion.map(task => new Task(task))
 
-const notion = await getNotion(new Client({ auth: process.env.NOTION_KEY }), filters, sorts)
-const tasks = notion.map(task => new Task(task))
+    //Initialize GCal client
+    const auth = await getAuth(JSON.parse(process.env.GCAL_CREDENTIALS), JSON.parse(process.env.GCAL_TOKEN));
+    const calendar = google.calendar({ version: 'v3', auth });
 
-//Initialize GCal client
-const auth = await getAuth(GCAL_CREDENTIALS, GCAL_TOKEN);
-const calendar = google.calendar({ version: 'v3', auth });
+    const conflicts = await getConflicts(calendar, tasks) 
 
-const conflicts = await getConflicts(calendar, tasks) 
+    const changedBlocks = assignBlocks(tasks, conflicts, record)
 
-const changedBlocks = assignBlocks(tasks, conflicts, record)
+    record.blocks.forEach(block => {
+        uploadEvent(calendar, auth, block)
+    })
 
-record.blocks.forEach(block => {
-    uploadEvent(calendar, auth, block)
-})
-
-//Cache updated record
-try {
-    if(record) {
-        fs.writeFileSync('./record.json', JSON.stringify(record, null, 4))
+    //Cache updated record
+    try {
+        if(record) {
+            fs.writeFileSync('./record.json', JSON.stringify(record, null, 4))
+        }
+    }
+    catch (err) {
+        console.log(err)
     }
 }
-catch (err) {
-    console.log(err)
-}
+
+await main()

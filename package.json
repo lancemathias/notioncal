@@ -10,13 +10,13 @@
     "dependencies": {
         "@notionhq/client": "^0.1.9",
         "dotenv": "^14.2.0",
-        "dotenv-json": "^1.0.0",
         "googleapis": "^39.2.0",
         "jest": "^27.4.7",
         "Math": "^0.0.1-security"
     },
     "scripts": {
-        "test": "jest ./scheduler.test.js"
+        "test": "jest ./scheduler.test.js",
+        "run": "node index.js"
     },
     "jest": {
         "verbose": true,
