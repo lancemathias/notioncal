@@ -6,7 +6,7 @@ Notioncal does this automatically by taking events from your Notion board and sc
 
 ## Getting started
 
-Requirements: npm, nodejs version 16+.
+Requirements: npm, nodejs version 16+.  
 Notion board must have the following format:
 - A number property named "Time" which corresponds to the estimated time commitment of the task, in hours
 - A date property named "Due" which is the due date of the task
@@ -31,7 +31,7 @@ After setup, just run `node index.js` and the script will handle the rest automa
 
 ## Nerd Stats
 
-Built using NodeJS
-APIs: Notion JS SDK, Google Calendar JavaScript API, Google OAuth Client
-Libraries: dotenv, fs, JSON, Jest unit testing
+Built using NodeJS  
+APIs: Notion JS SDK, Google Calendar JavaScript API, Google OAuth Client  
+Libraries: dotenv, fs, JSON, Jest unit testing  
 Algorithms: Custom-designed [greedy algorithm](https://people.eecs.berkeley.edu/~vazirani/algorithms/chap5.pdf) to optimize scheduling
