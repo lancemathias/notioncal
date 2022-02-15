@@ -28,3 +28,10 @@ Notion board should have allt he properties shown in the example here - extra pr
 ## Usage
 
 After setup, just run `node index.js` and the script will handle the rest automatically!
+
+## Nerd Stats
+
+Built using NodeJS
+APIs: Notion JS SDK, Google Calendar JavaScript API, Google OAuth Client
+Libraries: dotenv, fs, JSON, Jest unit testing
+Algorithms: Custom-designed [greedy algorithm](https://people.eecs.berkeley.edu/~vazirani/algorithms/chap5.pdf) to optimize scheduling
